@@ -18,6 +18,8 @@ module CarrierWave
     # [:fog_use_ssl_for_aws]              (optional) #public_url will use https for the AWS generated URL]
     # [:fog_aws_accelerate]               (optional) #public_url will use s3-accelerate subdomain
     #   instead of s3, defaults to false
+    # [:fog_aws_fips]                     (optional) #public_url will use s3-fips subdomain
+    #   instead of s3, defaults to false
     #
     #
     # AWS credentials contain the following keys:
@@ -382,6 +384,14 @@ module CarrierWave
 
                 subdomain_regex = /^(?:[a-z]|\d(?!\d{0,2}(?:\d{1,3}){3}$))(?:[a-z0-9\.]|(?![\-])|\-(?![\.])){1,61}[a-z0-9]$/
                 valid_subdomain = @uploader.fog_directory.to_s =~ subdomain_regex && !(protocol == 'https' && @uploader.fog_directory =~ /\./)
+
+                return nil if !valid_subdomain && @uploader.fog_aws_fips # FIPS Endpoints can only be used with Virtual Hosted-Style addressing.
+
+                s3_subdomain = @uploader.fog_aws_fips ? "s3-fips" : "s3"
+                if @uploader.fog_aws_fips
+                  region = @uploader.fog_credentials[:region].to_s
+                  return "#{protocol}://#{@uploader.fog_directory}.#{s3_subdomain}.#{region}.amazonaws.com/#{encoded_path}"
+                end
 
                 # if directory is a valid subdomain, use that style for access
                 if valid_subdomain
